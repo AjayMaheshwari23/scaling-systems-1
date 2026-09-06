@@ -6,6 +6,14 @@ This repository is a **learning project**, not a prebuilt application. You will 
 
 Live status of the activity: **`MOTIVATION_AND_STATE.md`** (why, what's built, current state, next steps).
 
+### One-command restart
+
+```bash
+bash tail-latency-lab-handoff/scripts/start-lab.sh --apps
+```
+
+(First time on a fresh clone: `bash tail-latency-lab-handoff/scripts/setup-lab.sh` once.)
+
 Read these in order:
 
 1. `AGENT_HANDOFF.md` — rules for your local agent.
