@@ -1,0 +1,201 @@
+name: tail-latency-lab
+
+services:
+  server-1:
+    container_name: tail-latency-server-1
+    build:
+      context: ../services/server-1
+    cpus: 1.0
+    mem_limit: 512m
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER2_BASE_URL: http://server-2:8080
+      SERVER3_BASE_URL: http://server-3:8080
+      SERVER4_BASE_URL: http://server-4:8080
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,prometheus,metrics
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/opentelemetry-javaagent.jar -XX:MaxRAMPercentage=55"
+      OTEL_SERVICE_NAME: server-1
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_TRACES_SAMPLER: parentbased_traceidratio
+      OTEL_TRACES_SAMPLER_ARG: ${OTEL_SAMPLE_RATIO:-0.05}
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=local-lab
+    volumes:
+      - ./otel-agent/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro
+    depends_on:
+      - server-2
+      - server-3
+      - server-4
+      - otel-collector
+
+  server-2:
+    container_name: tail-latency-server-2
+    build:
+      context: ../services/server-2
+    cpus: 0.5
+    mem_limit: 256m
+    ports:
+      - "8082:8080"
+    environment:
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,prometheus,metrics
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/opentelemetry-javaagent.jar -XX:MaxRAMPercentage=50"
+      OTEL_SERVICE_NAME: server-2
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_TRACES_SAMPLER: parentbased_traceidratio
+      OTEL_TRACES_SAMPLER_ARG: ${OTEL_SAMPLE_RATIO:-0.05}
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=local-lab
+    volumes:
+      - ./otel-agent/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro
+    depends_on:
+      - otel-collector
+
+  server-3:
+    container_name: tail-latency-server-3
+    build:
+      context: ../services/server-3
+    cpus: 0.5
+    mem_limit: 256m
+    ports:
+      - "8083:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/tail_latency
+      SPRING_DATASOURCE_USERNAME: lab
+      SPRING_DATASOURCE_PASSWORD: lab
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,prometheus,metrics
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/opentelemetry-javaagent.jar -XX:MaxRAMPercentage=50"
+      OTEL_SERVICE_NAME: server-3
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_TRACES_SAMPLER: parentbased_traceidratio
+      OTEL_TRACES_SAMPLER_ARG: ${OTEL_SAMPLE_RATIO:-0.05}
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=local-lab
+    volumes:
+      - ./otel-agent/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+
+  server-4:
+    container_name: tail-latency-server-4
+    build:
+      context: ../services/server-4
+    cpus: 0.5
+    mem_limit: 256m
+    ports:
+      - "8084:8080"
+    environment:
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,prometheus,metrics
+      JAVA_TOOL_OPTIONS: "-javaagent:/otel/opentelemetry-javaagent.jar -XX:MaxRAMPercentage=50"
+      OTEL_SERVICE_NAME: server-4
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_TRACES_SAMPLER: parentbased_traceidratio
+      OTEL_TRACES_SAMPLER_ARG: ${OTEL_SAMPLE_RATIO:-0.05}
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=local-lab
+    volumes:
+      - ./otel-agent/opentelemetry-javaagent.jar:/otel/opentelemetry-javaagent.jar:ro
+    depends_on:
+      - otel-collector
+
+  postgres:
+    container_name: tail-latency-postgres
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    cpus: 0.25
+    mem_limit: 1g
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: tail_latency
+      POSTGRES_USER: lab
+      POSTGRES_PASSWORD: lab
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lab -d tail_latency"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  prometheus:
+    container_name: tail-latency-prometheus
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:latest}
+    ports:
+      - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  tempo:
+    container_name: tail-latency-tempo
+    image: ${TEMPO_IMAGE:-grafana/tempo:latest}
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    ports:
+      - "3200:3200"
+    volumes:
+      - ./tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/data/tempo
+
+  otel-collector:
+    container_name: tail-latency-otel-collector
+    image: ${OTEL_COLLECTOR_IMAGE:-otel/opentelemetry-collector-contrib:latest}
+    command: ["--config=/etc/otelcol/config.yml"]
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./otel-collector/config.yml:/etc/otelcol/config.yml:ro
+    depends_on:
+      - tempo
+
+  grafana:
+    container_name: tail-latency-grafana
+    image: ${GRAFANA_IMAGE:-grafana/grafana:latest}
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - tempo
+
+  cadvisor:
+    container_name: tail-latency-cadvisor
+    image: ${CADVISOR_IMAGE:-gcr.io/cadvisor/cadvisor:latest}
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8085:8080"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+  tempo-data:

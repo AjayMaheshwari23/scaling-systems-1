@@ -1,0 +1,15 @@
+# Build output
+target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Local env
+*.local.properties
+
+# Logs
+*.log

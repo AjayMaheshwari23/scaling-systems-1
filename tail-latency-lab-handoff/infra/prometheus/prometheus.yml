@@ -1,0 +1,34 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: server-1
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["server-1:8080"]
+
+  - job_name: host-server-1
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
+
+  - job_name: server-2
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["server-2:8080"]
+
+  - job_name: server-3
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["server-3:8080"]
+
+  - job_name: server-4
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["server-4:8080"]
+
+  - job_name: cadvisor
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["cadvisor:8080"]
