@@ -4,6 +4,8 @@ This repository is a **learning project**, not a prebuilt application. You will 
 
 ## Start here
 
+Live status of the activity: **`MOTIVATION_AND_STATE.md`** (why, what's built, current state, next steps).
+
 Read these in order:
 
 1. `AGENT_HANDOFF.md` — rules for your local agent.
